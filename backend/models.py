@@ -68,6 +68,44 @@ class Batch:
         db = Database()
         db.execute_query("UPDATE batches SET status = ? WHERE batch_id = ?", (status, batch_id))
         db.close()
+        
+    @staticmethod
+    def update_batch_phase(batch_id, phase_id):
+        db = Database()
+        db.execute_query("UPDATE batches SET current_phase = ? WHERE batch_id = ?", (phase_id, batch_id))
+        db.close()
+
+    @staticmethod
+    def get_batch_by_barcode(barcode):
+        db = Database()
+        
+        barcode = barcode.strip() 
+        
+        print(f"Searching for barcode: '{barcode}' length: {len(barcode)}")  # Debugging
+        
+        query = """
+            SELECT 
+                b.batch_id, b.barcode, 
+                br.brand_name, 
+                m.model_name, 
+                s.size_value, 
+                c.color_name, 
+                b.quantity, b.layers, b.serial, 
+                p.phase_name, 
+                b.status
+            FROM batches b
+            LEFT JOIN brands br ON b.brand_id = br.brand_id
+            LEFT JOIN models m ON b.model_id = m.model_id
+            LEFT JOIN sizes s ON b.size_id = s.size_id
+            LEFT JOIN colors c ON b.color_id = c.color_id
+            LEFT JOIN production_phases p ON b.current_phase = p.phase_id
+            WHERE b.barcode = (?);
+        """
+        
+        batch = db.fetch_one(query, (barcode,))
+        print(f"Query Result for '{barcode}': {batch}")  # Debugging
+        db.close()
+        return batch
 
 # Production Phase Model
 class ProductionPhase:
@@ -92,12 +130,12 @@ class Brand:
                          (brand_name,))
         db.close()
         
-    @staticmethod 
+    @staticmethod
     def get_brands():
         db = Database()
-        brands = db.fetch_all("SELECT * FROM brands")
+        brands = db.fetch_all("SELECT brand_id, brand_name FROM brands")
         db.close()
-        return brands
+        return {b[1]: b[0] for b in brands} 
 
 class Model:
     @staticmethod
@@ -110,9 +148,9 @@ class Model:
     @staticmethod
     def get_models():
         db = Database()
-        models = db.fetch_all("SELECT * FROM models")
+        models = db.fetch_all("SELECT model_id, Model_name FROM models")
         db.close()
-        return models
+        return {m[1]: m[0] for m in models} 
 
 class Size:
     @staticmethod
@@ -122,12 +160,13 @@ class Size:
                          (size_value,))
         db.close()
     
+class Size:
     @staticmethod
     def get_sizes():
         db = Database()
-        sizes = db.fetch_all("SELECT * FROM sizes")
+        sizes = db.fetch_all("SELECT size_id, size_value FROM sizes")
         db.close()
-        return sizes
+        return {s[1]: s[0] for s in sizes}
 
 class Color:
     @staticmethod
@@ -137,9 +176,10 @@ class Color:
                          (color_name,))
         db.close()
     
+class Color:
     @staticmethod
     def get_colors():
         db = Database()
-        colors = db.fetch_all("SELECT * FROM colors")
+        colors = db.fetch_all("SELECT color_id, color_name FROM colors")
         db.close()
-        return colors
+        return {c[1]: c[0] for c in colors} 

@@ -3,6 +3,7 @@ import sqlite3
 def initialize_database():
     conn = sqlite3.connect('barcode_management.db')
     cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON;")
     
     # Users Table
     cursor.execute('''
