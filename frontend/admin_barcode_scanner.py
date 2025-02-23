@@ -15,61 +15,88 @@ style.theme_use("scidgreen")
 
 scanner_var = tk.StringVar()
 current_batch_id = None
-entry_vars = {}
+scanning_enabled = True  
 
-def update_batch_info(batch):
-    global current_batch_id
+def open_edit_popup():
+    global scanning_enabled
+    if not current_batch_id:
+        messagebox.showerror("Error", "No batch selected.")
+        return
 
-    if batch:
-        current_batch_id = batch[0]
+    scanning_enabled = False  
+    popup = tk.Toplevel(root)
+    popup.title("Edit Batch")
+    popup.geometry("300x200")
+    
+    popup.transient(root)  
+    popup.grab_set()       
 
-        headers = ["Barcode", "Brand", "Model", "Size", "Color", "Quantity", "Layers", "Serial", "Phase", "Status"]
-        values = batch[1:]
+    ttk.Label(popup, text="Select Phase:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+    phase_var = tk.StringVar(value=current_phase)
+    phase_dropdown = ttk.Combobox(popup, textvariable=phase_var, state="readonly")
+    phase_dropdown["values"] = [p[1] for p in ProductionPhase.get_phases()]
+    phase_dropdown.grid(row=0, column=1, padx=10, pady=5)
 
-        for widget in batch_info_frame.winfo_children():
-            widget.grid_forget()
+    ttk.Label(popup, text="Select Status:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+    status_var = tk.StringVar(value=current_status)
+    status_dropdown = ttk.Combobox(popup, textvariable=status_var, state="readonly")
+    status_dropdown["values"] = ["Pending", "In Progress", "Completed"]
+    status_dropdown.grid(row=1, column=1, padx=10, pady=5)
 
-        for i, (header, value) in enumerate(zip(headers, values)):
-            ttk.Label(batch_info_frame, text=header + ":", font=("Arial", 10, "bold"), anchor="w").grid(row=i, column=0, sticky="w", padx=10, pady=2)
-
-            if header in ["Phase", "Status"]:
-                if header not in entry_vars:
-                    entry_vars[header] = tk.StringVar(value=value)
-
-                dropdown = ttk.Combobox(batch_info_frame, textvariable=entry_vars[header], state="readonly")
-
-                if header == "Phase":
-                    dropdown["values"] = [p[1] for p in ProductionPhase.get_phases()]
-                else:
-                    dropdown["values"] = ["Pending", "In Progress", "Completed"]
-
-                dropdown.grid(row=i, column=1, sticky="ew", padx=10, pady=2)
-
-            else:
-                ttk.Label(batch_info_frame, text=value, font=("Arial", 10), anchor="w").grid(row=i, column=1, sticky="ew", padx=10, pady=2)
-
-        update_button.grid(row=len(headers), column=0, columnspan=2, pady=10)
-
-    else:
-        for widget in batch_info_frame.winfo_children():
-            widget.grid_forget()
-        ttk.Label(batch_info_frame, text="Batch not found.", font=("Arial", 10, "bold"), foreground="red").grid(row=0, column=0, columnspan=2, sticky="w", padx=10, pady=10)
-
-def update_batch():
-    if current_batch_id:
-        new_phase = entry_vars["Phase"].get()
-        new_status = entry_vars["Status"].get()
-
+    def save_changes():
+        global scanning_enabled
+        new_phase = phase_var.get()
+        new_status = status_var.get()
         phase_id = next((p[0] for p in ProductionPhase.get_phases() if p[1] == new_phase), None)
 
         if phase_id:
             Batch.update_batch_phase(current_batch_id, phase_id)
             Batch.update_batch_status(current_batch_id, new_status)
-            messagebox.showinfo("Success", "Batch updated successfully!")
+            messagebox.showinfo("Success", "Batch updated successfully!", parent=popup)
+            popup.destroy()
+            scanning_enabled = True  
+            focus_scanner_entry()  
+            update_batch_info(process_scanned_barcode(current_batch_barcode))  
         else:
-            messagebox.showerror("Error", "Invalid phase selected.")
+            messagebox.showerror("Error", "Invalid phase selected.", parent=popup)
+
+    ttk.Button(popup, text="Save", command=save_changes).grid(row=2, column=0, columnspan=2, pady=10)
+
+    def on_popup_close():
+        global scanning_enabled
+        scanning_enabled = True  
+        focus_scanner_entry()  
+        popup.destroy()
+
+    popup.protocol("WM_DELETE_WINDOW", on_popup_close)  
+
+def update_batch_info(batch):
+    global current_batch_id, current_phase, current_status, current_batch_barcode
+
+    for widget in batch_info_frame.winfo_children():
+        widget.destroy()
+
+    if batch:
+        current_batch_id = batch[0]
+        current_batch_barcode = batch[1]  
+        headers = ["Barcode", "Brand", "Model", "Size", "Color", "Quantity", "Layers", "Serial", "Phase", "Status"]
+        values = batch[1:]
+        current_phase = values[-2]
+        current_status = values[-1]
+
+        for i, (header, value) in enumerate(zip(headers, values)):
+            ttk.Label(batch_info_frame, text=header + ":", font=("Arial", 10, "bold"), anchor="w").grid(row=i, column=0, sticky="w", padx=10, pady=2)
+            ttk.Label(batch_info_frame, text=value, font=("Arial", 10), anchor="w").grid(row=i, column=1, sticky="w", padx=10, pady=2)
+
+        ttk.Button(batch_info_frame, text="Edit", command=open_edit_popup).grid(row=len(headers), column=0, columnspan=2, pady=10)
+
+    else:
+        ttk.Label(batch_info_frame, text="Batch not found.", font=("Arial", 10, "bold"), foreground="red").grid(row=0, column=0, columnspan=2, sticky="w", padx=10, pady=10)
 
 def on_barcode_scan(event=None):
+    if not scanning_enabled:  
+        return
+
     scanned_code = scanner_var.get().strip()
     if scanned_code:
         batch = process_scanned_barcode(scanned_code)
@@ -79,11 +106,12 @@ def on_barcode_scan(event=None):
 
 hidden_scanner_entry = tk.Entry(root, textvariable=scanner_var, font=("Arial", 1), width=1)
 hidden_scanner_entry.place(x=-100, y=-100)
-hidden_scanner_entry.bind("<Return>", on_barcode_scan) 
+hidden_scanner_entry.bind("<Return>", on_barcode_scan)  
 
 def focus_scanner_entry():
-    hidden_scanner_entry.focus_set()
-    root.after(500, focus_scanner_entry)
+    if scanning_enabled:
+        hidden_scanner_entry.focus_set()
+        root.after(500, focus_scanner_entry)
 
 root.after(500, focus_scanner_entry)
 
@@ -101,16 +129,6 @@ frame.columnconfigure(1, weight=1)
 batch_info_frame.columnconfigure(0, weight=1)
 batch_info_frame.columnconfigure(1, weight=1)
 
-update_button = ttk.Button(batch_info_frame, text="Edit", command=update_batch)
-update_button.grid(row=11, column=0, columnspan=2, pady=10)
-
-def apply_zoom():
-    update_font_size(12, style)
-    for widget in batch_info_frame.winfo_children():
-        if isinstance(widget, ttk.Label):
-            widget.configure(font=("Arial", 12))  
-
 zoom_slider(root, style)
-root.bind("<Configure>", lambda e: apply_zoom())
-
+update_font_size(12, style)
 root.mainloop()

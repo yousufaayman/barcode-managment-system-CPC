@@ -27,7 +27,7 @@ class User:
     @staticmethod
     def create_user(username, password, role):
         db = Database()
-        db.execute_query("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", 
+        db.execute_query("INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)", 
                          (username, password, role))
         db.close()
 
@@ -35,13 +35,6 @@ class User:
     def get_user(username):
         db = Database()
         user = db.fetch_one("SELECT * FROM users WHERE username = ?", (username,))
-        db.close()
-        return user
-    
-    @staticmethod
-    def delete_user(username):
-        db = Database()
-        user = db.execute_query("DELETE FROM users WHERE username = ?", (username,))
         db.close()
         return user
 
@@ -78,11 +71,7 @@ class Batch:
     @staticmethod
     def get_batch_by_barcode(barcode):
         db = Database()
-        
-        barcode = barcode.strip() 
-        
-        print(f"Searching for barcode: '{barcode}' length: {len(barcode)}")  # Debugging
-        
+        barcode = barcode.strip()
         query = """
             SELECT 
                 b.batch_id, b.barcode, 
@@ -101,19 +90,12 @@ class Batch:
             LEFT JOIN production_phases p ON b.current_phase = p.phase_id
             WHERE b.barcode = (?);
         """
-        
         batch = db.fetch_one(query, (barcode,))
-        print(f"Query Result for '{barcode}': {batch}")  # Debugging
         db.close()
         return batch
 
 # Production Phase Model
 class ProductionPhase:
-    def add_production_phase(phase_name):
-        db = Database()
-        db.execute_query("INSERT INTO production_phases (phase_name) VALUES (?)",
-                         (phase_name,))
-        db.close()
     @staticmethod
     def get_phases():
         db = Database()
@@ -126,41 +108,43 @@ class Brand:
     @staticmethod
     def add_brand(brand_name):
         db = Database()
-        db.execute_query("INSERT INTO brands (brand_name) VALUES (?)",
-                         (brand_name,))
+        db.execute_query("INSERT OR IGNORE INTO brands (brand_name) VALUES (?)", (brand_name,))
+        brand = db.fetch_one("SELECT brand_id FROM brands WHERE brand_name = ?", (brand_name,))
         db.close()
-        
+        return brand[0] if brand else None
+
     @staticmethod
     def get_brands():
         db = Database()
         brands = db.fetch_all("SELECT brand_id, brand_name FROM brands")
         db.close()
-        return {b[1]: b[0] for b in brands} 
+        return {b[1]: b[0] for b in brands}
 
 class Model:
     @staticmethod
     def add_model(model_name):
         db = Database()
-        db.execute_query("INSERT INTO models (model_name) VALUES (?)",
-                         (model_name,))
+        db.execute_query("INSERT OR IGNORE INTO models (model_name) VALUES (?)", (model_name,))
+        model = db.fetch_one("SELECT model_id FROM models WHERE model_name = ?", (model_name,))
         db.close()
-    
+        return model[0] if model else None
+
     @staticmethod
     def get_models():
         db = Database()
-        models = db.fetch_all("SELECT model_id, Model_name FROM models")
+        models = db.fetch_all("SELECT model_id, model_name FROM models")
         db.close()
-        return {m[1]: m[0] for m in models} 
+        return {m[1]: m[0] for m in models}
 
 class Size:
     @staticmethod
     def add_size(size_value):
         db = Database()
-        db.execute_query("INSERT INTO sizes (size_value) VALUES (?)",
-                         (size_value,))
+        db.execute_query("INSERT OR IGNORE INTO sizes (size_value) VALUES (?)", (size_value,))
+        size = db.fetch_one("SELECT size_id FROM sizes WHERE size_value = ?", (size_value,))
         db.close()
-    
-class Size:
+        return size[0] if size else None
+
     @staticmethod
     def get_sizes():
         db = Database()
@@ -172,14 +156,14 @@ class Color:
     @staticmethod
     def add_color(color_name):
         db = Database()
-        db.execute_query("INSERT INTO colors (color_name) VALUES (?)",
-                         (color_name,))
+        db.execute_query("INSERT OR IGNORE INTO colors (color_name) VALUES (?)", (color_name,))
+        color = db.fetch_one("SELECT color_id FROM colors WHERE color_name = ?", (color_name,))
         db.close()
-    
-class Color:
+        return color[0] if color else None
+
     @staticmethod
     def get_colors():
         db = Database()
         colors = db.fetch_all("SELECT color_id, color_name FROM colors")
         db.close()
-        return {c[1]: c[0] for c in colors} 
+        return {c[1]: c[0] for c in colors}
