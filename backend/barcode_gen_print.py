@@ -23,24 +23,28 @@ def generate_barcode_image(barcode_string, model_name, size_value, color_name, q
         barcode_buffer.seek(0)
         barcode_img = Image.open(barcode_buffer)
 
-        text_info = f"Model: {model_name}  |  Size: {size_value}  |  Color: {color_name}  |  Qty: {quantity}"
+        text_info1 = f"Model: {model_name}  |  Size: {size_value}"
+        text_info2 = f"Color: {color_name}  |  Qty: {quantity}"
 
-        text_height = 80
+        text_height = 150  
         new_height = barcode_img.height + text_height
-        new_img = Image.new("RGB", (barcode_img.width + 60, new_height), "white")
+        new_img = Image.new("RGB", (barcode_img.width + 20, new_height), "white")
 
         new_img.paste(barcode_img, (0, 0))
 
         draw = ImageDraw.Draw(new_img)
 
         try:
-            font = ImageFont.truetype("arial.ttf", 40)
+            font = ImageFont.truetype("arial.ttf", 40)  
         except IOError:
-            font = ImageFont.load_default() 
+            font = ImageFont.load_default()
 
         text_x = 20  
-        text_y = barcode_img.height + 5 
-        draw.text((text_x, text_y), text_info, fill="black", font=font)
+        text_y1 = barcode_img.height + 20  
+        text_y2 = barcode_img.height + 80  
+
+        draw.text((text_x, text_y1), text_info1, fill="black", font=font)
+        draw.text((text_x, text_y2), text_info2, fill="black", font=font)
 
         if preview_only:
             return new_img

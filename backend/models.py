@@ -1,15 +1,26 @@
 import sqlite3
+import time
 
 DB_PATH = "barcode_management.db"
 
 class Database:
     def __init__(self):
-        self.conn = sqlite3.connect(DB_PATH)
+        self.conn = sqlite3.connect(DB_PATH, timeout=10)
         self.cursor = self.conn.cursor()
 
     def execute_query(self, query, params=()):
-        self.cursor.execute(query, params)
-        self.conn.commit()
+        """Executes a query with retries to handle database locking."""
+        for _ in range(5):
+            try:
+                self.cursor.execute(query, params)
+                self.conn.commit()
+                return
+            except sqlite3.OperationalError as e:
+                if "database is locked" in str(e).lower():
+                    time.sleep(1)
+                else:
+                    raise e 
+        raise sqlite3.OperationalError("Database is locked and couldn't complete the operation.")
 
     def fetch_all(self, query, params=()):
         self.cursor.execute(query, params)
@@ -22,39 +33,53 @@ class Database:
     def close(self):
         self.conn.close()
 
-# User Model
-class User:
-    @staticmethod
-    def create_user(username, password, role):
-        db = Database()
-        db.execute_query("INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)", 
-                         (username, password, role))
-        db.close()
-
-    @staticmethod
-    def get_user(username):
-        db = Database()
-        user = db.fetch_one("SELECT * FROM users WHERE username = ?", (username,))
-        db.close()
-        return user
-
-# Batch Model
 class Batch:
     @staticmethod
     def create_batch(barcode, brand_id, model_id, size_id, color_id, quantity, layers, serial, current_phase, status):
         db = Database()
+
+        # Check if barcode already exists
+        existing_batch = db.fetch_one("SELECT batch_id FROM batches WHERE barcode = ?", (barcode,))
+        
+        if existing_batch:
+            print(f"⚠️ Barcode '{barcode}' already exists. Skipping insertion.")
+            db.close()
+            return
+
         db.execute_query(
             "INSERT INTO batches (barcode, brand_id, model_id, size_id, color_id, quantity, layers, serial, current_phase, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (barcode, brand_id, model_id, size_id, color_id, quantity, layers, serial, current_phase, status),
         )
         db.close()
 
+
     @staticmethod
     def get_batches():
         db = Database()
-        batches = db.fetch_all("SELECT * FROM batches")
+        query = """
+            SELECT 
+                b.batch_id, 
+                b.barcode, 
+                br.brand_name, 
+                m.model_name, 
+                s.size_value, 
+                c.color_name, 
+                b.quantity, 
+                b.layers, 
+                b.serial, 
+                p.phase_name, 
+                b.status
+            FROM batches b
+            LEFT JOIN brands br ON b.brand_id = br.brand_id
+            LEFT JOIN models m ON b.model_id = m.model_id
+            LEFT JOIN sizes s ON b.size_id = s.size_id
+            LEFT JOIN colors c ON b.color_id = c.color_id
+            LEFT JOIN production_phases p ON b.current_phase = p.phase_id
+        """
+        batches = db.fetch_all(query)
         db.close()
         return batches
+
 
     @staticmethod
     def update_batch_status(batch_id, status):
@@ -94,16 +119,22 @@ class Batch:
         db.close()
         return batch
 
-# Production Phase Model
+    @staticmethod
+    def delete_batch(batch_id):
+        """Deletes a batch entry from the database using batch_id."""
+        db = Database()
+        db.execute_query("DELETE FROM batches WHERE batch_id = ?", (batch_id,))
+        db.close()
+
+
 class ProductionPhase:
     @staticmethod
     def get_phases():
         db = Database()
-        phases = db.fetch_all("SELECT * FROM production_phases")
+        phases = db.fetch_all("SELECT phase_id, phase_name FROM production_phases")
         db.close()
-        return phases
+        return {p[1]: p[0] for p in phases}
 
-# Admin-Managed Data Models
 class Brand:
     @staticmethod
     def add_brand(brand_name):

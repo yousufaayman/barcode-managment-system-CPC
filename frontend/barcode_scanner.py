@@ -3,7 +3,6 @@ from tkinter import ttk, messagebox
 from ttkthemes import ThemedTk
 from backend.barcode_scanning import process_scanned_barcode  
 from backend.models import Batch, ProductionPhase
-from utils.helpers import update_font_size, zoom_slider
 
 root = ThemedTk(theme="scidgreen")
 root.title("Barcode Management System")
@@ -104,14 +103,14 @@ def on_barcode_scan(event=None):
         scanner_var.set("")
     return "break"
 
-hidden_scanner_entry = tk.Entry(root, textvariable=scanner_var, font=("Arial", 1), width=1)
-hidden_scanner_entry.place(x=-100, y=-100)
-hidden_scanner_entry.bind("<Return>", on_barcode_scan)  
-
 def focus_scanner_entry():
     if scanning_enabled:
         hidden_scanner_entry.focus_set()
         root.after(500, focus_scanner_entry)
+
+hidden_scanner_entry = tk.Entry(root, textvariable=scanner_var, font=("Arial", 1), width=1)
+hidden_scanner_entry.place(x=-100, y=-100)
+hidden_scanner_entry.bind("<Return>", on_barcode_scan)  
 
 root.after(500, focus_scanner_entry)
 
@@ -129,6 +128,8 @@ frame.columnconfigure(1, weight=1)
 batch_info_frame.columnconfigure(0, weight=1)
 batch_info_frame.columnconfigure(1, weight=1)
 
-zoom_slider(root, style)
-update_font_size(12, style)
 root.mainloop()
+
+
+
+
