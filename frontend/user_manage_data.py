@@ -6,9 +6,10 @@ from backend.barcode_gen_print import get_available_printers, print_barcode_zebr
 
 
 class UserManageData(tk.Frame):
-    def __init__(self, parent, controller):
+    def __init__(self, parent, controller, role):
         super().__init__(parent)
         self.controller = controller
+        self.user_role = role
 
         self.grid(row=0, column=0, sticky="nsew")
         self.grid_rowconfigure(1, weight=1)
@@ -17,6 +18,7 @@ class UserManageData(tk.Frame):
         self.create_filter_frame()
         self.create_table_frame()
         self.populate_dropdowns()
+        self.set_default_phase_filter()
         self.filter_batches()
 
     def create_filter_frame(self):
@@ -182,15 +184,23 @@ class UserManageData(tk.Frame):
         
         batches = Batch.get_batches()
         for batch in batches:
-            batch_id = batch[0]
-            display_batch = batch[1:]
+            batch_id = batch["batch_id"] 
+
+            display_batch = (
+                batch["barcode"], batch["brand_name"], batch["model_name"], 
+                batch["size_value"], batch["color_name"], batch["quantity"], 
+                batch["layers"], batch["serial"], batch["phase_name"], batch["status"]
+            )
+
             match = True
             for key, idx in filter_mapping.items():
                 if filters[key] and filters[key] not in str(display_batch[idx]).lower():
                     match = False
                     break
+
             if match:
                 self.tree.insert("", tk.END, values=display_batch, tags=("unchecked", str(batch_id)))
+    
 
         self.tree.grid(row=0, column=0, sticky="nsew")
 
@@ -234,12 +244,13 @@ class UserManageData(tk.Frame):
             for item in selected_items:
                 values = self.tree.item(item, "values")
                 barcode = values[0]
+                brand = values[1]
                 model = values[2]
                 size = values[3]
                 color = values[4]
                 quantity = values[5]
 
-                print_barcode_zebra(barcode, model, size, color, quantity, printer_name)
+                print_barcode_zebra(barcode, brand, model, size, color, quantity, printer_name)
 
             messagebox.showinfo("Success", f"Successfully printed {len(selected_items)} barcodes!")
 
@@ -258,3 +269,16 @@ class UserManageData(tk.Frame):
             for item in all_items:
                 self.tree.change_state(item, "checked")
 
+    def update_data(self):
+        self.filter_batches()
+            
+    def set_default_phase_filter(self):
+        """Sets the default phase filter based on the user role."""
+        role_to_phase = {
+            "Cutting": "Cutting",
+            "Sewing": "Sewing",
+            "Packaging": "Packaging",
+            "Admin": ""
+        }
+        default_phase = role_to_phase.get(self.user_role, "")
+        self.phase_var.set(default_phase)

@@ -153,7 +153,6 @@ class AdminManageData(tk.Frame):
             "status": self.status_var.get().strip().lower()
         }
 
-        # Clear previous tree if exists
         for widget in self.table_frame.winfo_children():
             widget.destroy()
 
@@ -187,17 +186,24 @@ class AdminManageData(tk.Frame):
         
         batches = Batch.get_batches()
         for batch in batches:
-            batch_id = batch[0]
-            display_batch = batch[1:]
+            batch_id = batch["batch_id"] 
+
+            display_batch = (
+                batch["barcode"], batch["brand_name"], batch["model_name"], 
+                batch["size_value"], batch["color_name"], batch["quantity"], 
+                batch["layers"], batch["serial"], batch["phase_name"], batch["status"]
+            )
+
             match = True
             for key, idx in filter_mapping.items():
                 if filters[key] and filters[key] not in str(display_batch[idx]).lower():
                     match = False
                     break
+
             if match:
                 self.tree.insert("", tk.END, values=display_batch, tags=("unchecked", str(batch_id)))
+    
 
-        # **Grid settings for proper expansion**
         self.tree.grid(row=0, column=0, sticky="nsew")
 
         vsb = ttk.Scrollbar(self.table_frame, orient="vertical", command=self.tree.yview)
@@ -208,7 +214,6 @@ class AdminManageData(tk.Frame):
         hsb.grid(row=1, column=0, sticky="ew", columnspan=2)
         self.tree.configure(xscrollcommand=hsb.set)
 
-        # **Ensure tree expands with frame**
         self.table_frame.grid_rowconfigure(0, weight=1)
         self.table_frame.grid_columnconfigure(0, weight=1)
         self.tree.grid_rowconfigure(0, weight=1)
@@ -241,12 +246,13 @@ class AdminManageData(tk.Frame):
             for item in selected_items:
                 values = self.tree.item(item, "values")
                 barcode = values[0]
+                brand = values[1]
                 model = values[2]
                 size = values[3]
                 color = values[4]
                 quantity = values[5]
 
-                print_barcode_zebra(barcode, model, size, color, quantity, printer_name)
+                print_barcode_zebra(barcode, brand, model, size, color, quantity, printer_name)
 
             messagebox.showinfo("Success", f"Successfully printed {len(selected_items)} barcodes!")
 
@@ -349,3 +355,5 @@ class AdminManageData(tk.Frame):
             for item in all_items:
                 self.tree.change_state(item, "checked")
 
+    def update_data(self):
+        self.filter_batches()
